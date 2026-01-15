@@ -60,6 +60,4 @@ create table notifications (
 
 -- Seed Data for Doctors
 insert into doctors (name, specialty, email, phone, crm_id) values
-('Dr. Alice Smith', 'Cardiology', 'alice@example.com', '+15550101', 'CRM-001'),
-('Dr. Bob Jones', 'Dermatology', 'bob@example.com', '+15550102', 'CRM-002'),
-('Dr. Carol White', 'Pediatrics', 'carol@example.com', '+15550103', 'CRM-003');
+('Dr. Hrmant Khajja', 'General Physician', 'hemant@seva-sangrah.com', '+919876543210', 'CRM-KH01');
