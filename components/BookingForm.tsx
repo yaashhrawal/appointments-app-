@@ -95,71 +95,102 @@ export default function BookingForm() {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-6 p-6 border rounded-xl shadow-lg max-w-md mx-auto bg-white">
-            <h2 className="text-2xl font-bold mb-6 text-gray-900 text-center">Book an Appointment</h2>
+        <form onSubmit={handleSubmit} className="space-y-6 p-8 border-0 rounded-3xl shadow-2xl max-w-lg mx-auto bg-white/90 backdrop-blur-lg">
+            <h2 className="text-3xl font-extrabold mb-8 text-slate-800 text-center tracking-tight">
+                Book Your <span className="text-indigo-600">Appointment</span>
+            </h2>
 
-            <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">Select Doctor</label>
-                <select
-                    value={selectedDoctor}
-                    onChange={(e) => setSelectedDoctor(e.target.value)}
-                    className="w-full h-12 px-3 border border-gray-300 rounded-lg text-base text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                >
-                    <option value="">-- Choose a Doctor --</option>
-                    {doctors.map((doc) => (
-                        <option key={doc.crm_id} value={doc.crm_id}>
-                            {doc.name} - {doc.specialty}
-                        </option>
-                    ))}
-                </select>
-            </div>
+            <div className="space-y-5">
+                <div>
+                    <label className="block text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">Doctor</label>
+                    <select
+                        value={selectedDoctor}
+                        onChange={(e) => setSelectedDoctor(e.target.value)}
+                        className="w-full h-14 px-4 bg-slate-50 border-0 rounded-xl text-lg text-slate-800 focus:ring-2 focus:ring-indigo-500 transition-all font-medium"
+                        required
+                    >
+                        <option value="">Select a Specialist</option>
+                        {doctors.map((doc) => (
+                            <option key={doc.crm_id} value={doc.crm_id}>
+                                {doc.name} - {doc.specialty}
+                            </option>
+                        ))}
+                    </select>
+                </div>
 
-            <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">Your Name</label>
-                <input
-                    type="text"
-                    value={patientName}
-                    onChange={(e) => setPatientName(e.target.value)}
-                    className="w-full h-12 px-3 border border-gray-300 rounded-lg text-base text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                />
-            </div>
+                <div>
+                    <label className="block text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">Patient Name</label>
+                    <input
+                        type="text"
+                        value={patientName}
+                        onChange={(e) => setPatientName(e.target.value)}
+                        className="w-full h-14 px-4 bg-slate-50 border-0 rounded-xl text-lg text-slate-800 focus:ring-2 focus:ring-indigo-500 transition-all font-medium placeholder:text-slate-400"
+                        placeholder="John Doe"
+                        required
+                    />
+                </div>
 
-            <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">Email</label>
-                <input
-                    type="email"
-                    value={patientEmail}
-                    onChange={(e) => setPatientEmail(e.target.value)}
-                    className="w-full h-12 px-3 border border-gray-300 rounded-lg text-base text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                />
-            </div>
+                <div>
+                    <label className="block text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">Email Address</label>
+                    <input
+                        type="email"
+                        value={patientEmail}
+                        onChange={(e) => setPatientEmail(e.target.value)}
+                        className="w-full h-14 px-4 bg-slate-50 border-0 rounded-xl text-lg text-slate-800 focus:ring-2 focus:ring-indigo-500 transition-all font-medium placeholder:text-slate-400"
+                        placeholder="john@example.com"
+                        required
+                    />
+                </div>
 
-            <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">Date & Time</label>
-                <input
-                    type="datetime-local"
-                    value={appointmentDate}
-                    onChange={(e) => setAppointmentDate(e.target.value)}
-                    className="w-full h-12 px-3 border border-gray-300 rounded-lg text-base text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                />
+                <div>
+                    <label className="block text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">Date & Time</label>
+                    <input
+                        type="datetime-local"
+                        value={appointmentDate}
+                        onChange={(e) => setAppointmentDate(e.target.value)}
+                        className="w-full h-14 px-4 bg-slate-50 border-0 rounded-xl text-lg text-slate-800 focus:ring-2 focus:ring-indigo-500 transition-all font-medium"
+                        required
+                    />
+                </div>
+
+                <div className="pt-4 border-t border-slate-100">
+                    <details className="group">
+                        <summary className="list-none flex justify-between items-center cursor-pointer text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                            <span>🔗 Book via Seva-Connect (Cross-App)</span>
+                            <span className="transition group-open:rotate-180">▼</span>
+                        </summary>
+                        <div className="mt-4 space-y-4 p-4 bg-indigo-50 rounded-xl">
+                            <p className="text-xs text-indigo-800 mb-2">Enter Partner details to book in their system.</p>
+                            <input
+                                type="text"
+                                placeholder="Partner API URL (e.g. https://partner-app.com)"
+                                className="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm"
+                            />
+                            <input
+                                type="text"
+                                placeholder="Partner API Key (sk_seva_...)"
+                                className="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm"
+                            />
+                            <button type="button" className="w-full py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700">
+                                Verify & Search Partner Slots
+                            </button>
+                        </div>
+                    </details>
+                </div>
             </div>
 
             <button
                 type="submit"
                 disabled={loading}
-                className="w-full h-14 bg-blue-600 text-white text-lg font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition active:scale-95 shadow-md"
+                className="w-full h-16 mt-8 bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-xl font-bold rounded-2xl hover:shadow-lg hover:shadow-indigo-500/40 disabled:opacity-50 transition-all active:scale-[0.98]"
             >
-                {loading ? 'Booking...' : 'Book Appointment'}
+                {loading ? 'Confirming...' : 'Confirm Appointment'}
             </button>
 
             {message && (
-                <p className={`mt-4 text-center text-base font-medium ${message.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>
+                <div className={`mt-6 p-4 rounded-xl text-center font-medium ${message.includes('Error') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
                     {message}
-                </p>
+                </div>
             )}
         </form>
     );

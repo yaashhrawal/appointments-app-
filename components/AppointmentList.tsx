@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { fetchAppointmentsFromCRM } from '@/lib/crm';
 
 interface Appointment {
     id: string;
-    patient_name: string; // Joined or stored
+    patient_name: string;
     start_time: string;
     status: string;
     crm_appointment_id: string;
+    source?: string;
 }
 
 export default function AppointmentList() {
@@ -18,9 +20,8 @@ export default function AppointmentList() {
     useEffect(() => {
         async function fetchAppointments() {
             try {
-                // In a real app, you'd filter by the logged-in doctor's ID
-                // Here we join with patients table to get names
-                const { data, error } = await supabase
+                // 1. Fetch Local Appointments
+                const { data: localData, error } = await supabase
                     .from('appointments')
                     .select(`
                     id, 
@@ -31,24 +32,39 @@ export default function AppointmentList() {
                 `)
                     .order('start_time', { ascending: true });
 
-                if (error) throw error;
+                const localFormatted = (localData || []).map((apt: any) => ({
+                    id: apt.id,
+                    patient_name: apt.patients?.name || 'Unknown',
+                    start_time: apt.start_time,
+                    status: apt.status,
+                    crm_appointment_id: apt.crm_appointment_id,
+                    source: 'LOCAL'
+                }));
 
-                if (data) {
-                    const formatted = data.map((apt: any) => ({
-                        id: apt.id,
-                        patient_name: apt.patients?.name || 'Unknown',
-                        start_time: apt.start_time,
-                        status: apt.status,
-                        crm_appointment_id: apt.crm_appointment_id,
-                    }));
-                    setAppointments(formatted);
-                }
-            } catch (err) {
-                console.error('Error fetching appointments:', err);
+                // 2. Fetch CRM Appointments
+                const crmData = await fetchAppointmentsFromCRM();
+                const crmFormatted = crmData.map(apt => ({
+                    id: apt.id,
+                    patient_name: 'CRM Patient', // Ideally join with CRM patients
+                    start_time: `${apt.appointment_date}T${apt.appointment_time}`,
+                    status: apt.status.toLowerCase(),
+                    crm_appointment_id: apt.id,
+                    source: 'CRM'
+                }));
+
+                // 3. Merge and Sort
+                const merged = [...localFormatted, ...crmFormatted].sort((a, b) =>
+                    new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+                );
+
+                setAppointments(merged);
+
+            } catch (err: any) {
+                console.warn('Supabase Connection Issue:', err.message);
+
                 // Mock data for display if connection fails
                 setAppointments([
-                    { id: '1', patient_name: 'John Doe', start_time: new Date().toISOString(), status: 'scheduled', crm_appointment_id: 'CRM-101' },
-                    { id: '2', patient_name: 'Jane Smith', start_time: new Date(Date.now() + 86400000).toISOString(), status: 'scheduled', crm_appointment_id: 'CRM-102' },
+                    { id: '1', patient_name: 'John Doe (Demo)', start_time: new Date().toISOString(), status: 'scheduled', crm_appointment_id: 'CRM-101', source: 'LOCAL' },
                 ]);
             } finally {
                 setLoading(false);
@@ -58,44 +74,67 @@ export default function AppointmentList() {
         fetchAppointments();
     }, []);
 
-    if (loading) return <div className="text-gray-500">Loading appointments...</div>;
+    if (loading) return <div className="text-slate-500 p-8 text-center animate-pulse">Loading appointments...</div>;
 
     return (
-        <div className="bg-white shadow-lg rounded-xl overflow-hidden">
-            <div className="px-4 py-5 sm:px-6 border-b border-gray-100">
-                <h3 className="text-xl font-bold text-gray-900">Upcoming Appointments</h3>
-                <p className="mt-1 max-w-2xl text-sm text-gray-500">Syncing with Hospital CRM</p>
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div>
+                    <h3 className="text-xl font-bold text-slate-900">Upcoming Appointments</h3>
+                    <p className="text-sm text-slate-500 mt-1">Syncing with <span className="font-medium text-indigo-600">Hospital CRM</span></p>
+                </div>
+                <div className="flex gap-2">
+                    <span className="px-3 py-1 bg-green-50 text-green-700 text-xs font-semibold rounded-full border border-green-100">Live Sync Active</span>
+                </div>
             </div>
-            <ul className="divide-y divide-gray-100">
+
+            <ul className="divide-y divide-slate-100">
                 {appointments.length === 0 ? (
-                    <li className="px-6 py-6 text-center text-gray-500">No appointments found.</li>
+                    <li className="p-8 text-center text-slate-500">
+                        <div className="inline-block p-4 rounded-full bg-slate-50 mb-3">🗓️</div>
+                        <p>No appointments scheduled for today.</p>
+                    </li>
                 ) : (
                     appointments.map((apt) => (
-                        <li key={apt.id} className="block hover:bg-gray-50 transition duration-150 ease-in-out">
-                            <div className="px-4 py-5 sm:px-6">
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="text-lg font-semibold text-blue-700 truncate">
-                                        {apt.patient_name}
+                        <li key={apt.id} className="group hover:bg-slate-50 transition-all duration-200">
+                            <div className="px-6 py-5">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="flex items-start gap-4">
+                                        <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-lg flex-shrink-0">
+                                            {apt.patient_name.charAt(0)}
+                                        </div>
+                                        <div>
+                                            <h4 className="text-lg font-semibold text-slate-900 group-hover:text-indigo-700 transition-colors">
+                                                {apt.patient_name}
+                                            </h4>
+                                            <p className="text-sm text-slate-500 mt-0.5">
+                                                ID: <span className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded">{apt.crm_appointment_id ? apt.crm_appointment_id.substring(0, 8) : 'PENDING'}</span>
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="ml-2 flex-shrink-0 flex">
-                                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${apt.status === 'scheduled' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                                            }`}>
-                                            {apt.status}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="mt-2 sm:flex sm:justify-between">
-                                    <div className="sm:flex">
-                                        <p className="flex items-center text-sm text-gray-500 mb-1 sm:mb-0">
-                                            <span className="font-medium mr-2">Id:</span> {apt.crm_appointment_id || 'Pending Sync'}
-                                        </p>
-                                    </div>
-                                    <div className="mt-2 flex items-center text-sm text-gray-600 sm:mt-0 font-medium">
-                                        <p>
-                                            {new Date(apt.start_time).toLocaleString(undefined, {
-                                                weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                                            })}
-                                        </p>
+
+                                    <div className="flex items-center gap-6">
+                                        <div className="text-right">
+                                            <p className="text-sm font-semibold text-slate-900">
+                                                {new Date(apt.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </p>
+                                            <p className="text-xs text-slate-500">
+                                                {new Date(apt.start_time).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                                            </p>
+                                        </div>
+                                        <div className="flex flex-col gap-1 items-end">
+                                            <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${apt.status === 'scheduled' || apt.status === 'confirmed'
+                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                                                }`}>
+                                                {apt.status.toUpperCase()}
+                                            </span>
+                                            {apt.source === 'CRM' && (
+                                                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 uppercase tracking-wide">
+                                                    External CRM
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>

@@ -49,16 +49,31 @@ export default function Notifications() {
     }, []);
 
     return (
-        <div className="bg-white p-4 rounded-lg shadow mb-6 border-l-4 border-yellow-400">
-            <h3 className="font-bold text-gray-800 mb-2">Notifications</h3>
-            <ul className="space-y-2">
-                {notifications.map((n) => (
-                    <li key={n.id} className={`text-sm ${n.read_status ? 'text-gray-500' : 'text-gray-900 font-medium'}`}>
-                        • {n.message} <span className="text-xs text-gray-400">({new Date(n.created_at).toLocaleTimeString()})</span>
-                    </li>
-                ))}
-                {notifications.length === 0 && <li className="text-gray-500 text-sm">No new notifications.</li>}
-            </ul>
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden h-fit">
+            <div className="p-6 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
+                <h3 className="font-bold text-slate-800 text-lg">Notifications</h3>
+                <span className="bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-1 rounded-full">
+                    {notifications.length} New
+                </span>
+            </div>
+            <div className="max-h-[400px] overflow-y-auto">
+                {notifications.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 text-sm">
+                        No new notifications
+                    </div>
+                ) : (
+                    <ul className="divide-y divide-slate-50">
+                        {notifications.map((notif) => (
+                            <li key={notif.id} className="p-4 hover:bg-slate-50 transition-colors">
+                                <p className="text-sm text-slate-700 leading-relaxed">{notif.message}</p>
+                                <span className="text-xs text-slate-400 mt-2 block font-medium">
+                                    {new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
         </div>
     );
 }

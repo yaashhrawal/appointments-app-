@@ -1,27 +1,80 @@
-// lib/crm.ts
+import { supabase } from './supabase';
 
 export interface Doctor {
-    id: string;
+    id: string; // our app ID
     name: string;
     specialty: string;
     phone: string;
-    crm_id: string;
+    crm_id: string; // CRM's doctor ID
+}
+
+export interface CRMAppointment {
+    id: string;
+    patient_id: string;
+    doctor_id: string;
+    appointment_date: string;
+    appointment_time: string;
+    status: string;
+    reason: string;
+    hospital_id: string;
 }
 
 const MOCK_DOCTORS: Doctor[] = [
-    { id: 'uuid-1', name: 'Dr. Alice Smith', specialty: 'Cardiology', phone: '+15550101', crm_id: 'CRM-001' },
-    { id: 'uuid-2', name: 'Dr. Bob Jones', specialty: 'Dermatology', phone: '+15550102', crm_id: 'CRM-002' },
-    { id: 'uuid-3', name: 'Dr. Carol White', specialty: 'Pediatrics', phone: '+15550103', crm_id: 'CRM-003' },
+    { id: 'uuid-1', name: 'Dr. Alice Smith (CRM)', specialty: 'Cardiology', phone: '+15550101', crm_id: 'CRM-001' },
+    { id: 'uuid-2', name: 'Dr. Bob Jones (CRM)', specialty: 'Dermatology', phone: '+15550102', crm_id: 'CRM-002' },
 ];
 
 export async function fetchDoctorsFromCRM(): Promise<Doctor[]> {
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    return MOCK_DOCTORS;
+    try {
+        // Fetch from CRM's 'doctors' table if it exists
+        const { data, error } = await supabase
+            .from('doctors')
+            .select('*');
+
+        if (error || !data) {
+            console.warn('CRM Doctors fetch failed, using internal dict or defaults', error);
+            // Fallback to mock if table missing (or using different schema)
+            return MOCK_DOCTORS;
+        }
+
+        return data.map((d: any) => ({
+            id: d.id, // Or map to a new ID if needed
+            name: d.name,
+            specialty: d.specialization || d.specialty || 'General',
+            phone: '+1555000000', // CRM schema might not have phone exposed or different col
+            crm_id: d.id
+        }));
+    } catch (e) {
+        console.warn('Fetch Doctors Error:', e);
+        return MOCK_DOCTORS;
+    }
+}
+
+export async function fetchAppointmentsFromCRM(): Promise<CRMAppointment[]> {
+    try {
+        const { data, error } = await supabase
+            .from('future_appointments')
+            .select('*')
+            .order('appointment_date', { ascending: true })
+            .limit(20);
+
+        if (error) {
+            // Table might not exist yet if user hasn't run the CRM SQL
+            // or if it's named slightly differently
+            console.warn('CRM Appointments fetch failed:', error.message);
+            return [];
+        }
+
+        return data as CRMAppointment[];
+    } catch (e) {
+        console.error('Fetch CRM Appointments Error:', e);
+        return [];
+    }
 }
 
 export async function syncAppointmentToCRM(appointmentData: any): Promise<string> {
-    // Simulate sending data to CRM and getting an ID back
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // Placeholder for pushing back to CRM
+    // For now, we simulate success
+    await new Promise((resolve) => setTimeout(resolve, 800));
     return `CRM-APT-${Math.floor(Math.random() * 10000)}`;
 }

@@ -34,6 +34,20 @@ create table appointments (
   created_at timestamp with time zone default now()
 );
 
+-- API Keys Table for Seva-Connect
+create table api_keys (
+  id uuid primary key default uuid_generate_v4(),
+  label text not null,
+  key text unique not null,
+  is_active boolean default true,
+  created_at timestamp with time zone default now()
+);
+
+-- Seed Data for API Keys (For Demo)
+insert into api_keys (label, key) values
+('Partner Clinic A', 'sk_seva_mock_12345'),
+('City Hospital B', 'sk_seva_mock_67890');
+
 -- Notifications Table
 create table notifications (
   id uuid primary key default uuid_generate_v4(),
