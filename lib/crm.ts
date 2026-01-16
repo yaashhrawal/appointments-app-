@@ -19,7 +19,9 @@ export interface CRMAppointment {
     hospital_id: string;
 }
 
-{ id: 'uuid-1', name: 'Dr. Hemant Khajja', specialty: 'General Physician', phone: '+919876543210', crm_id: 'CRM-KH01' },
+const MOCK_DOCTORS: Doctor[] = [
+    { id: 'uuid-1', name: 'Dr. Hemant Khajja', specialty: 'General Physician', phone: '+919876543210', crm_id: 'CRM-KH01' },
+];
 
 export async function fetchDoctorsFromCRM(): Promise<Doctor[]> {
     try {
