@@ -23,25 +23,29 @@ const MOCK_DOCTORS: Doctor[] = [
     { id: 'uuid-1', name: 'Dr. Hemant Khajja', specialty: 'General Physician', phone: '+919876543210', crm_id: 'CRM-KH01' },
 ];
 
+const HOSPITAL_ID = '550e8400-e29b-41d4-a716-446655440000'; // Bhilwara Hospital
+
 export async function fetchDoctorsFromCRM(): Promise<Doctor[]> {
     try {
-        // Fetch from CRM's 'doctors' table if it exists
+        // Fetch from Hospital-CRM 'doctors' table
         const { data, error } = await supabase
             .from('doctors')
-            .select('*');
+            .select('*')
+            .eq('hospital_id', HOSPITAL_ID)
+            .eq('is_active', true);
 
-        if (error || !data) {
-            console.warn('CRM Doctors fetch failed, using internal dict or defaults', error);
-            // Fallback to mock if table missing (or using different schema)
+        if (error || !data || data.length === 0) {
+            console.warn('CRM Doctors fetch failed, using mock data', error);
             return MOCK_DOCTORS;
         }
 
+        console.log('✅ Fetched doctors from CRM doctors table:', data.length);
         return data.map((d: any) => ({
-            id: d.id, // Or map to a new ID if needed
+            id: d.id,
             name: d.name,
-            specialty: d.specialization || d.specialty || 'General',
-            phone: '+1555000000', // CRM schema might not have phone exposed or different col
-            crm_id: d.id
+            specialty: d.specialization || d.department || 'General Physician',
+            phone: '+1555000000',
+            crm_id: d.id  // crm_id = doctors.id for appointments foreign key
         }));
     } catch (e) {
         console.warn('Fetch Doctors Error:', e);

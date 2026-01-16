@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { fetchDoctorsFromCRM, Doctor } from '@/lib/crm';
 import { supabase } from '@/lib/supabase';
+import { syncAppointmentToCRM } from '@/lib/crmIntegration';
 
 export default function BookingForm() {
     const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -17,6 +18,7 @@ export default function BookingForm() {
         async function loadDoctors() {
             const docs = await fetchDoctorsFromCRM();
             setDoctors(docs);
+            console.log('Loaded doctors:', docs);
         }
         loadDoctors();
     }, []);
@@ -27,68 +29,65 @@ export default function BookingForm() {
         setMessage('');
 
         try {
-            // 1. Create Patient (or find existing)
-            // For simplicity, we create a new entry every time or you could check email
-            const { data: patient, error: patientError } = await supabase
-                .from('patients')
-                .insert([{ name: patientName, email: patientEmail }])
-                .select()
-                .single();
+            const selectedDoctorObj = doctors.find(d => d.crm_id === selectedDoctor);
+            if (!selectedDoctorObj) {
+                throw new Error('Please select a doctor');
+            }
 
-            if (patientError) throw patientError;
+            // Define time variables
+            const appointmentStartTime = new Date(appointmentDate).toISOString();
+            const appointmentEndTime = new Date(new Date(appointmentDate).getTime() + 30 * 60000).toISOString();
 
-            // 2. Create Appointment
-            const { error: appointmentError } = await supabase
-                .from('appointments')
-                .insert([{
-                    doctor_id: doctors.find(d => d.crm_id === selectedDoctor)?.id, // In real app, map correctly
-                    patient_id: patient.id,
-                    start_time: new Date(appointmentDate).toISOString(),
-                    end_time: new Date(new Date(appointmentDate).getTime() + 30 * 60000).toISOString(), // 30 mins
-                    status: 'scheduled'
-                }]);
+            // Create mock patient object for CRM sync
+            const mockPatient = {
+                id: `temp-${Date.now()}`,
+                name: patientName,
+                email: patientEmail,
+                phone: null
+            };
 
-            if (appointmentError) throw appointmentError;
+            // Directly sync to Hospital-CRM (this creates patient and appointment there)
+            console.log('Starting CRM sync...');
+            const crmAppointmentId = await syncAppointmentToCRM({
+                patient: mockPatient,
+                doctor: selectedDoctorObj,
+                startTime: appointmentStartTime,
+                endTime: appointmentEndTime,
+                status: 'scheduled'
+            });
 
-            // 3. Send Notification to Doctor
-            const doctor = doctors.find(d => d.crm_id === selectedDoctor);
-            if (doctor && doctor.phone) {
+            console.log('✅ CRM Sync Result:', crmAppointmentId);
+
+            // Send Notification to Doctor
+            if (selectedDoctorObj && selectedDoctorObj.phone) {
                 try {
                     await fetch('/api/notify', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            to: doctor.phone,
+                            to: selectedDoctorObj.phone,
                             message: `New Appointment: ${patientName} @ ${new Date(appointmentDate).toLocaleString()}`,
-                            type: 'whatsapp' // Defaulting to WhatsApp as requested preference
+                            type: 'whatsapp'
                         })
                     });
                 } catch (notifyError) {
                     console.error('Failed to send notification:', notifyError);
-                    // Don't block success message for notification failure
                 }
             }
 
-            setMessage('Appointment booked successfully! Doctor notified.');
+            const syncStatus = crmAppointmentId === 'SYNC_FAILED'
+                ? ' (CRM sync pending - will retry)'
+                : '';
+            setMessage(`Appointment booked successfully! Doctor notified.${syncStatus}`);
+
+            // Reset form
+            setPatientName('');
+            setPatientEmail('');
+            setAppointmentDate('');
+            setSelectedDoctor('');
         } catch (error: any) {
             console.error(error);
-            // Fallback for demo without real Supabase connection
-            if (error.message?.includes('FetchError') || !process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('http')) {
-                // Simulate success for demo
-                const doctor = doctors.find(d => d.crm_id === selectedDoctor);
-                await fetch('/api/notify', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        to: doctor?.phone || '+000000',
-                        message: `[DEMO] New Appointment: ${patientName}`,
-                        type: 'whatsapp'
-                    })
-                });
-
-                setMessage('Simulated Success: Appointment booked & Notification Sent (Supabase not connected)');
-            } else {
-                setMessage('Error booking appointment: ' + error.message);
-            }
+            setMessage('Error booking appointment: ' + error.message);
         } finally {
             setLoading(false);
         }

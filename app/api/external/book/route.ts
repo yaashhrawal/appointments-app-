@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { sendNotification } from '@/lib/notifications';
+import { syncAppointmentToCRM } from '@/lib/crmIntegration';
 
 export async function POST(request: Request) {
     try {
@@ -20,33 +21,112 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { patient_name, patient_phone, doctor_crm_id, slot_time } = body;
+        const { patient_name, patient_phone, patient_email, doctor_crm_id, slot_time } = body;
 
         // 2. Validate Request
         if (!patient_name || !doctor_crm_id || !slot_time) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        // 3. Create Appointment (Logic similar to BookingForm but server-side)
+        // 3. Create or find patient
+        let patient;
+        if (patient_phone) {
+            const { data: existingPatient } = await supabase
+                .from('patients')
+                .select('*')
+                .eq('phone', patient_phone)
+                .single();
 
-        // Find Doctor by CRM ID (Mock lookup)
-        // const { data: doctor } = await supabase.from('doctors').eq('crm_id', doctor_crm_id).single();
-        // For MVP demo, we assume doctor exists if CRM ID is provided or fetch from mock
+            if (existingPatient) {
+                patient = existingPatient;
+            }
+        }
 
-        // Setup mock response for successful booking
-        const appointmentId = `APT-EXT-${Math.floor(Math.random() * 100000)}`;
+        if (!patient) {
+            const { data: newPatient, error: patientError } = await supabase
+                .from('patients')
+                .insert([{
+                    name: patient_name,
+                    phone: patient_phone || null,
+                    email: patient_email || null
+                }])
+                .select()
+                .single();
 
-        // 4. Send Confirmation Notification (Mock)
-        // We'd look up the doctor's phone here in a real scenario
-        await sendNotification({
-            to: '+0000000000', // Placeholder
-            message: `[Seva-Connect] External Booking: ${patient_name} @ ${new Date(slot_time).toLocaleString()}`,
-            type: 'whatsapp'
-        });
+            if (patientError) throw patientError;
+            patient = newPatient;
+        }
+
+        // 4. Find Doctor by CRM ID
+        const { data: doctor } = await supabase
+            .from('doctors')
+            .select('*')
+            .eq('crm_id', doctor_crm_id)
+            .single();
+
+        if (!doctor) {
+            return NextResponse.json({ error: 'Doctor not found' }, { status: 404 });
+        }
+
+        // 5. Create Appointment
+        const appointmentStartTime = new Date(slot_time).toISOString();
+        const appointmentEndTime = new Date(new Date(slot_time).getTime() + 30 * 60000).toISOString();
+
+        const { data: appointment, error: appointmentError } = await supabase
+            .from('appointments')
+            .insert([{
+                doctor_id: doctor.id,
+                patient_id: patient.id,
+                start_time: appointmentStartTime,
+                end_time: appointmentEndTime,
+                status: 'scheduled'
+            }])
+            .select()
+            .single();
+
+        if (appointmentError) throw appointmentError;
+
+        // 6. Sync with Hospital-CRM
+        let crmAppointmentId = 'SYNC_FAILED';
+        try {
+            crmAppointmentId = await syncAppointmentToCRM({
+                patient: patient,
+                doctor: doctor,
+                startTime: appointmentStartTime,
+                endTime: appointmentEndTime,
+                status: 'scheduled'
+            });
+
+            // Update local appointment with CRM ID
+            if (crmAppointmentId !== 'SYNC_FAILED') {
+                await supabase
+                    .from('appointments')
+                    .update({ crm_appointment_id: crmAppointmentId })
+                    .eq('id', appointment.id);
+            }
+        } catch (crmError: any) {
+            console.error('❌ External API CRM Sync Failed:', crmError);
+            // Continue with response
+        }
+
+        // 7. Send Confirmation Notification
+        if (doctor.phone) {
+            try {
+                await sendNotification({
+                    to: doctor.phone,
+                    message: `[Seva-Connect] External Booking: ${patient_name} @ ${new Date(slot_time).toLocaleString()}`,
+                    type: 'whatsapp'
+                });
+            } catch (notifyError) {
+                console.error('Notification failed:', notifyError);
+            }
+        }
 
         return NextResponse.json({
             success: true,
-            appointment_id: appointmentId,
+            appointment_id: appointment.id,
+            crm_appointment_id: crmAppointmentId,
+            crm_synced: crmAppointmentId !== 'SYNC_FAILED',
             message: 'Appointment scheduled via Seva-Connect'
         });
 
